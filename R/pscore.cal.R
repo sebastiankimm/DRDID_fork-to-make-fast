@@ -6,14 +6,21 @@
 #       = 2 if GLM logit estimator was used (both IPT and trust did not converge)}
 
 
-pscore.cal <- function(D, int.cov, i.weights, n){
+pscore.cal <- function(D, int.cov, i.weights, n, nthreads){
   #-----------------------------------------------------------------------------
   #-----------------------------------------------------------------------------
   # Initial conditions for pscore
-  pslogit <- suppressWarnings(stats::glm(D ~ -1 + int.cov, family = "binomial",
-                                         weights = i.weights))
+  tmp <- data.frame(D,int.cov)
+  names(tmp)[which(names(tmp) == "X.Intercept.")] <- "Intercept" # name gets transfomred, but must be "intercept"
+  form <- paste0("D~", paste(colnames(int.cov), collapse = "+"), "-1") # render formula, intercept is included in int.cov
+  pslogit <- suppressWarnings(fixest::feglm(as.formula(form), family = "binomial",
+                                         weights = i.weights, data = tmp, lean = TRUE))
 
-  init.gamma <- suppressWarnings(stats::coef(pslogit))
+  init.gamma <- suppressWarnings(pslogit$coefficients)
+  init.gamma <- as.vector(init.gamma)
+
+  rm(tmp)
+  gc()
 
   #Compute IPT pscore
   pscore.cal <- suppressWarnings(trust::trust(loss.ps.cal, parinit = init.gamma, rinit=1,
@@ -40,7 +47,8 @@ pscore.cal <- function(D, int.cov, i.weights, n){
   }
 
   #Compute fitted pscore and weights for regression
-  pscore.index <- tcrossprod(gamma.cal, int.cov)
+  pscore.index <- cpppar_xbeta(int.cov, matrix(gamma.cal, nrow = 1, ncol = length(gamma.cal)), nthreads = nthreads) # equivalent to tcrossprod(gamma.cal, int.cov)
+  pscore.index <- as.vector(pscore.index)
   pscore <- as.numeric(stats::plogis(pscore.index))
 
   if(flag==1) {

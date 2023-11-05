@@ -13,7 +13,8 @@ drdid_imp_panel(
   boot = FALSE,
   boot.type = "weighted",
   nboot = NULL,
-  inffunc = FALSE
+  inffunc = FALSE,
+  nthreads = NULL
 )
 }
 \arguments{

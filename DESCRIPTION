@@ -22,6 +22,9 @@ Depends:
 Imports:
     stats,
     trust,
+    fixest,
+    collapse,
+    Rcpp,
     BMisc (>= 1.4.1)
 RoxygenNote: 7.2.3
 Suggests:
@@ -29,6 +32,7 @@ Suggests:
     rmarkdown,
     spelling,
     testthat
+LinkingTo: Rcpp
 Date: 2023-05-18
 Language: en-US
 BugReports: https://github.com/pedrohcgs/DRDID/issues

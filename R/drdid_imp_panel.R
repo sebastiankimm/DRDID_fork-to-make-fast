@@ -86,7 +86,7 @@ NULL
 #' @export
 
 drdid_imp_panel <-function(y1, y0, D, covariates, i.weights = NULL, boot = FALSE, boot.type = "weighted",
-                           nboot = NULL, inffunc = FALSE){
+                           nboot = NULL, inffunc = FALSE, nthreads = NULL){
   #-----------------------------------------------------------------------------
   # D as vector
   D <- as.vector(D)
@@ -104,29 +104,37 @@ drdid_imp_panel <-function(y1, y0, D, covariates, i.weights = NULL, boot = FALSE
     }
   }
 
+  # nthreads
+  if(is.null(nthreads)){
+    fixest::setFixest_nthreads()
+    n_threads <- fixest::getFixest_nthreads()
+  }
+
   # Weights
   if(is.null(i.weights)) {
     i.weights <- as.vector(rep(1, n))
   } else if(min(i.weights) < 0) stop("i.weights must be non-negative")
   #-----------------------------------------------------------------------------
   #Compute the Pscore using the pscore.cal
-  pscore.ipt <- pscore.cal(D, int.cov, i.weights = i.weights, n = n)
+  pscore.ipt <- pscore.cal(D, int.cov, i.weights = i.weights, n = n, nthreads = n_threads)
   ps.fit <- as.vector(pscore.ipt$pscore)
   ps.fit <- pmin(ps.fit, 1 - 1e-16)
+
+
   #Compute the Outcome regression for the control group
-  outcome.reg <- wols.br.panel(deltaY, D, int.cov, ps.fit, i.weights)
+  outcome.reg <- wols.br.panel(deltaY, D, int.cov, ps.fit, i.weights, nthreads = n_threads)
   out.delta <-  as.vector(outcome.reg$out.reg)
 
   #Compute Bias-Reduced Doubly Robust DiD estimators
   dr.att.summand.num <- as.vector((1 - (1 - D)/(1 - ps.fit)) * (deltaY - out.delta))
-  dr.att <- mean(i.weights * dr.att.summand.num)/mean(D * i.weights)
+  dr.att <- collapse::fmean(i.weights * dr.att.summand.num)/collapse::fmean(D * i.weights)
 
   #get the influence function to compute standard error
-  dr.att.inf.func <- as.vector(i.weights * (dr.att.summand.num - D * dr.att) / mean(D * i.weights))
+  dr.att.inf.func <- as.vector(i.weights * (dr.att.summand.num - D * dr.att) / collapse::fmean(D * i.weights))
 
   if (boot == FALSE) {
     # Estimate of standard error
-    se.dr.att <- stats::sd(dr.att.inf.func)/sqrt(n)
+    se.dr.att <- collapse::fsd(dr.att.inf.func)/sqrt(n)
     # Estimate of upper boudary of 95% CI
     uci <- dr.att + 1.96 * se.dr.att
     # Estimate of lower doundary of 95% CI
@@ -143,7 +151,7 @@ drdid_imp_panel <-function(y1, y0, D, covariates, i.weights = NULL, boot = FALSE
       # get bootstrap std errors based on IQR
       se.dr.att <- stats::IQR(dr.boot) / (stats::qnorm(0.75) - stats::qnorm(0.25))
       # get symmtric critival values
-      cv <- stats::quantile(abs(dr.boot/se.dr.att), probs = 0.95)
+      cv <- collapse::fquantile(abs(dr.boot/se.dr.att), probs = 0.95)
       # Estimate of upper boudary of 95% CI
       uci <- dr.att + cv * se.dr.att
       # Estimate of lower doundary of 95% CI
@@ -151,11 +159,11 @@ drdid_imp_panel <-function(y1, y0, D, covariates, i.weights = NULL, boot = FALSE
     } else {
       # do weighted bootstrap
       dr.boot <- unlist(lapply(1:nboot, wboot.dr.imp.panel,
-                               n = n, deltaY = deltaY, D = D, int.cov = int.cov, i.weights = i.weights))
+                               n = n, deltaY = deltaY, D = D, int.cov = int.cov, i.weights = i.weights, nthreads = n_threads))
       # get bootstrap std errors based on IQR
       se.dr.att <- stats::IQR((dr.boot - dr.att)) / (stats::qnorm(0.75) - stats::qnorm(0.25))
       # get symmtric critival values
-      cv <- stats::quantile(abs((dr.boot - dr.att)/se.dr.att), probs = 0.95)
+      cv <- collapse::fquantile(abs((dr.boot - dr.att)/se.dr.att), probs = 0.95)
       # Estimate of upper boudary of 95% CI
       uci <- dr.att + cv * se.dr.att
       # Estimate of lower doundary of 95% CI

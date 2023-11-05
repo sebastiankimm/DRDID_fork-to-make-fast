@@ -10,7 +10,7 @@ mboot.did = function(linrep, nboot){
   bootapply <- function(nn,  n = n, linrep = linrep) {
     v <- stats::rbinom(n, 1, pkappa)
     v <- ifelse(v == 1, k1, k2)
-    b.did <- mean(linrep * v)
+    b.did <- collapse::fmean(linrep * v)
     return(b.did)
   }
 

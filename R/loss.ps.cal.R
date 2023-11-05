@@ -13,7 +13,7 @@ loss.ps.cal <- function(gam, D, int.cov, iw){
     #exp.ps.ind <- exp(-ps.ind)
     exp.ps.ind <- exp(ps.ind)
     #val <- base::mean(ifelse(D, exp.ps.ind, ps.ind) * iw)
-    val <- - base::mean(ifelse(D, ps.ind, -exp.ps.ind) * iw)
+    val <- - collapse::fmean(ifelse(D, ps.ind, -exp.ps.ind) * iw)
 
     #grad <- apply(ifelse(D, -exp.ps.ind, 1) * iw * int.cov, 2, mean)
     grad <- - apply(ifelse(D, 1, -exp.ps.ind) * iw * int.cov, 2, mean)
